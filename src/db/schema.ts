@@ -143,6 +143,16 @@ CREATE TABLE IF NOT EXISTS notification_channels (
   created_at TEXT NOT NULL DEFAULT (datetime('now'))
 );
 
+-- Chat Messages
+CREATE TABLE IF NOT EXISTS chat_messages (
+  id TEXT PRIMARY KEY,
+  conversation_id TEXT NOT NULL,
+  role TEXT NOT NULL CHECK(role IN ('user', 'assistant')),
+  content TEXT NOT NULL,
+  tool_calls TEXT,
+  created_at TEXT NOT NULL DEFAULT (datetime('now'))
+);
+
 -- FTS5 virtual table on entities
 CREATE VIRTUAL TABLE IF NOT EXISTS entities_fts USING fts5(
   name,
@@ -180,6 +190,7 @@ CREATE INDEX IF NOT EXISTS idx_audit_log_timestamp ON audit_log(timestamp);
 CREATE INDEX IF NOT EXISTS idx_audit_log_actor ON audit_log(actor);
 CREATE INDEX IF NOT EXISTS idx_approvals_job_id ON approvals(job_id);
 CREATE INDEX IF NOT EXISTS idx_approvals_token ON approvals(token);
+CREATE INDEX IF NOT EXISTS idx_chat_messages_conv ON chat_messages(conversation_id, created_at);
 `;
 
 export function applySchema(db: Database): void {

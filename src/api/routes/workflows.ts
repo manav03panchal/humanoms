@@ -157,6 +157,9 @@ export function workflowsRoutes(db: Database) {
         404
       );
     }
+    // Cascade-delete dependent rows before removing the workflow
+    db.run("DELETE FROM automations WHERE workflow_id = ?", [id]);
+    db.run("DELETE FROM jobs WHERE workflow_id = ?", [id]);
     db.run("DELETE FROM workflows WHERE id = ?", [id]);
     return c.json({ ok: true, data: { deleted: true } });
   });

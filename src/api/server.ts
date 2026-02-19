@@ -1,4 +1,6 @@
 import { Hono } from "hono";
+import { serveStatic } from "hono/bun";
+import { cors } from "hono/cors";
 import type { Database } from "bun:sqlite";
 import { authMiddleware } from "./middleware/auth.ts";
 import { rateLimitMiddleware } from "./middleware/rate-limit.ts";
@@ -10,10 +12,14 @@ import { workflowsRoutes } from "./routes/workflows.ts";
 import { automationsRoutes } from "./routes/automations.ts";
 import { filesRoutes } from "./routes/files.ts";
 import { jobsRoutes } from "./routes/jobs.ts";
+import { createChatRoutes } from "./routes/chat.ts";
+
+import type { Scheduler } from "../scheduler/scheduler.ts";
 
 interface AppConfig {
   db: Database;
   apiKeyHash: string | null;
+  scheduler?: Scheduler;
 }
 
 export function createApp(config: AppConfig) {
@@ -21,6 +27,7 @@ export function createApp(config: AppConfig) {
   const audit = new AuditLog(config.db);
 
   // Global middleware
+  app.use("/api/*", cors({ origin: "*" }));
   app.use("/api/*", rateLimitMiddleware());
   app.use("/api/*", authMiddleware(config.apiKeyHash));
   app.use("/api/*", auditMiddleware(audit));
@@ -31,8 +38,6 @@ export function createApp(config: AppConfig) {
       ok: true,
       data: {
         status: "running",
-        uptime: process.uptime(),
-        version: "0.1.0",
       },
     });
   });
@@ -44,6 +49,13 @@ export function createApp(config: AppConfig) {
   app.route("/api/v1/automations", automationsRoutes(config.db));
   app.route("/api/v1/files", filesRoutes(config.db));
   app.route("/api/v1/jobs", jobsRoutes(config.db));
+  app.route("/api/v1", createChatRoutes(config.db, config.scheduler));
+
+  // Root redirect
+  app.get("/", (c) => c.redirect("/index.html"));
+
+  // Serve static frontend files
+  app.use("/*", serveStatic({ root: "./web" }));
 
   // 404 fallback
   app.notFound((c) => {

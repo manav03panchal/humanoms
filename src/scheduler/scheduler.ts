@@ -57,10 +57,10 @@ export class Scheduler {
       this.jobs.get(auto.id)!.stop();
     }
 
+    const parsedInput = JSON.parse(auto.input || "{}") as Record<string, unknown>;
     const cron = new Cron(auto.cron_expression, () => {
       log.info({ id: auto.id, name: auto.name }, "Automation triggered");
-      const input = JSON.parse(auto.input || "{}") as Record<string, unknown>;
-      this.onTrigger(auto.workflow_id, input);
+      this.onTrigger(auto.workflow_id, parsedInput);
 
       this.db
         .query("UPDATE automations SET last_run = datetime('now') WHERE id = ?")

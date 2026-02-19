@@ -2,6 +2,7 @@ import { Hono } from "hono";
 import type { Database, SQLQueryBindings } from "bun:sqlite";
 import { generateId } from "../../lib/ulid.ts";
 import { CreateEntitySchema, UpdateEntitySchema } from "../../lib/validation.ts";
+import { ENTITY_COLUMN_ALLOWLIST } from "../../security/sandbox.ts";
 
 export function entitiesRoutes(db: Database) {
   const router = new Hono();
@@ -143,7 +144,7 @@ export function entitiesRoutes(db: Database) {
     const values: SQLQueryBindings[] = [new Date().toISOString()];
 
     for (const [key, value] of Object.entries(updates)) {
-      if (value !== undefined) {
+      if (value !== undefined && ENTITY_COLUMN_ALLOWLIST.has(key)) {
         sets.push(`${key} = ?`);
         values.push(
           key === "tags" || key === "properties"

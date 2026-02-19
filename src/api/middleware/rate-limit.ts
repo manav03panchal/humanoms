@@ -2,13 +2,27 @@ import type { Context, Next } from "hono";
 
 const WINDOW_MS = 60_000; // 1 minute
 const MAX_REQUESTS = 100;
+const MAX_MAP_SIZE = 10_000;
 
 const hits = new Map<string, { count: number; resetAt: number }>();
 
+function sweepExpired(now: number) {
+  for (const [key, entry] of hits) {
+    if (now > entry.resetAt) {
+      hits.delete(key);
+    }
+  }
+}
+
 export function rateLimitMiddleware() {
   return async (c: Context, next: Next) => {
-    const key = c.req.header("Authorization") || "anonymous";
+    const key = c.req.header("x-forwarded-for") || "unknown";
     const now = Date.now();
+
+    // Periodic cleanup to prevent unbounded memory growth
+    if (hits.size > MAX_MAP_SIZE) {
+      sweepExpired(now);
+    }
 
     let entry = hits.get(key);
     if (!entry || now > entry.resetAt) {

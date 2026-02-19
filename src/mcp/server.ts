@@ -4,6 +4,7 @@ import { registerTaskTools } from "./tools/tasks.ts";
 import { registerEntityTools } from "./tools/entities.ts";
 import { registerWorkflowTools } from "./tools/workflows.ts";
 import { registerSystemTools } from "./tools/system.ts";
+import { registerFileTools } from "./tools/files.ts";
 
 export function createMcpServer(db: Database): McpServer {
   const server = new McpServer({
@@ -15,6 +16,7 @@ export function createMcpServer(db: Database): McpServer {
   registerEntityTools(server, db);
   registerWorkflowTools(server, db);
   registerSystemTools(server, db);
+  registerFileTools(server, db);
 
   return server;
 }

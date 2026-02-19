@@ -168,8 +168,8 @@ describe("Workflow Pipeline Integration", () => {
       .get(jobId) as { status: string };
     expect(row.status).toBe("rejected");
 
-    // Job remains in awaiting_approval (caller decides what to do)
-    expect(queue.getJob(jobId)?.status).toBe("awaiting_approval");
+    // Rejected approval fails the job
+    expect(queue.getJob(jobId)?.status).toBe("failed");
   });
 
   test("skip failure policy continues to next step", async () => {

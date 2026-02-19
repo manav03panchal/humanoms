@@ -27,16 +27,36 @@ if (process.argv.includes("--mcp")) {
   await mcpServer.connect(transport);
   log.info("MCP server started on stdio");
 } else {
+  // ── Derive master key + secrets store ────────────────────────────────
+  const masterKeyBuffer = deriveKey(config.masterKey, "humanoms-master-salt");
+  const secrets = new SecretStore(db, masterKeyBuffer);
+
+  // Read API key hash from database (NOT from .env — Bun's dotenv
+  // mangles Argon2 hashes because it expands $ even inside quotes).
+  const apiKeyHash = secrets.get("api_key_hash") ?? null;
+
+  // ── Job queue + executor ───────────────────────────────────────────
+  const jobQueue = new JobQueue(db);
+  const executor = new WorkflowExecutor(db, jobQueue, config.masterKey);
+
+  // ── Scheduler (automations + recurring tasks) ──────────────────────
+  const scheduler = new Scheduler(db, (workflowId, input) => {
+    jobQueue.enqueue(workflowId, input);
+  });
+  scheduler.start();
+
   // ── HTTP server ────────────────────────────────────────────────────
   const app = createApp({
     db,
-    apiKeyHash: config.apiKeyHash ?? null,
+    apiKeyHash,
+    scheduler,
   });
 
   const server = Bun.serve({
     port: config.port,
     hostname: config.host,
     fetch: app.fetch,
+    idleTimeout: 255, // seconds — SSE streams (chat) need long-lived connections
   });
 
   log.info(
@@ -44,13 +64,12 @@ if (process.argv.includes("--mcp")) {
     "HumanOMS server started"
   );
 
-  // ── Job queue + executor ───────────────────────────────────────────
-  const jobQueue = new JobQueue(db);
-  const executor = new WorkflowExecutor(db, jobQueue, config.masterKey);
-
-  const jobPollInterval = setInterval(async () => {
+  let jobPollDelay = 200;
+  let jobPollTimer: ReturnType<typeof setTimeout>;
+  async function pollJobs() {
     const job = jobQueue.dequeue();
     if (job) {
+      jobPollDelay = 200; // fast drain
       try {
         await executor.executeJob(job);
       } catch (err) {
@@ -60,46 +79,55 @@ if (process.argv.includes("--mcp")) {
           completed_at: new Date().toISOString(),
         });
       }
+    } else {
+      jobPollDelay = Math.min(jobPollDelay * 2, 10000); // backoff up to 10s
     }
-  }, 2000);
-
-  // ── Scheduler (automations + recurring tasks) ──────────────────────
-  const scheduler = new Scheduler(db, (workflowId, input) => {
-    jobQueue.enqueue(workflowId, input);
-  });
-  scheduler.start();
+    jobPollTimer = setTimeout(pollJobs, jobPollDelay);
+  }
+  jobPollTimer = setTimeout(pollJobs, jobPollDelay);
 
   const recurringScheduler = new RecurringTaskScheduler(db);
   recurringScheduler.start();
 
   // ── Notification dispatcher + Discord (optional) ───────────────────
   const dispatcher = new NotificationDispatcher(db);
-
-  const masterKeyBuffer = deriveKey(config.masterKey, "humanoms-master-salt");
-  const secrets = new SecretStore(db, masterKeyBuffer);
+  executor.setDispatcher(dispatcher);
   const discordToken = secrets.get("discord_bot_token");
 
   let discordStopBot: (() => void) | null = null;
 
   if (discordToken) {
-    const approvalManager = new ApprovalManager(db, config.masterKey);
-    const { sender, startBot, stopBot } = createDiscordSender(
-      approvalManager.resolveApproval.bind(approvalManager)
-    );
-    dispatcher.registerSender("discord", sender);
-    discordStopBot = stopBot;
-    startBot(discordToken).catch((err) => {
-      log.warn(
-        { err },
-        "Failed to start Discord bot — notifications will be logged only"
+    const discordChannelId = secrets.get("discord_channel_id");
+    if (!discordChannelId) {
+      log.warn("discord_bot_token set but discord_channel_id missing — skipping Discord");
+    } else {
+      // Ensure a notification_channels row exists for Discord
+      db.run(
+        `INSERT OR REPLACE INTO notification_channels (id, type, name, config, enabled)
+         VALUES ('discord-default', 'discord', 'Discord', ?, 1)`,
+        [JSON.stringify({ channel_id: discordChannelId })]
       );
-    });
+
+      const approvalManager = new ApprovalManager(db, config.masterKey);
+      const { sender, startBot, stopBot } = createDiscordSender(
+        approvalManager.resolveApproval.bind(approvalManager)
+      );
+      dispatcher.registerSender("discord", sender);
+      discordStopBot = stopBot;
+      startBot(discordToken).catch((err) => {
+        log.warn(
+          { err },
+          "Failed to start Discord bot — notifications will be logged only"
+        );
+      });
+    }
   }
 
   // ── Graceful shutdown ──────────────────────────────────────────────
   async function shutdown() {
     log.info("Shutting down...");
-    clearInterval(jobPollInterval);
+    clearTimeout(jobPollTimer);
+    await executor.shutdown();
     scheduler.stop();
     recurringScheduler.stop();
     if (discordStopBot) discordStopBot();

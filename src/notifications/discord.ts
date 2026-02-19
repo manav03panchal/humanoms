@@ -36,6 +36,10 @@ export function createDiscordSender(
   stopBot: () => void;
 } {
   let client: DiscordClient | null = null;
+  // Discord custom_id max is 100 chars — JWT tokens exceed that.
+  // Map short IDs to full tokens for button interactions.
+  const pendingTokens = new Map<string, string>();
+  let tokenCounter = 0;
 
   const sender: ChannelSender = async (channel, notification) => {
     if (!client) {
@@ -54,20 +58,35 @@ export function createDiscordSender(
 
     if (isApproval) {
       const approval = notification as ApprovalNotification;
+      const shortId = String(++tokenCounter);
+      pendingTokens.set(shortId, approval.approveToken);
+      // Build extra fields from metadata for richer context
+      const extraFields: { name: string; value: string; inline?: boolean }[] = [
+        { name: "Job", value: approval.jobId, inline: true },
+        { name: "Step", value: String(approval.stepIndex + 1), inline: true },
+      ];
+      const meta = (approval as any).metadata as Record<string, unknown> | undefined;
+      if (meta) {
+        if (meta.tool) extraFields.push({ name: "Tool", value: String(meta.tool), inline: true });
+        // Show a preview of the input (truncated)
+        if (meta.input && typeof meta.input === "object") {
+          const preview = JSON.stringify(meta.input, null, 2);
+          if (preview.length > 2) {
+            extraFields.push({
+              name: "Input Preview",
+              value: "```json\n" + preview.slice(0, 900) + (preview.length > 900 ? "\n..." : "") + "\n```",
+            });
+          }
+        }
+      }
+
       await textChannel.send({
         embeds: [
           {
             title: approval.title,
             description: approval.message,
             color: 0xffa500,
-            fields: [
-              { name: "Job", value: approval.jobId, inline: true },
-              {
-                name: "Step",
-                value: String(approval.stepIndex),
-                inline: true,
-              },
-            ],
+            fields: extraFields,
           },
         ],
         components: [
@@ -78,13 +97,13 @@ export function createDiscordSender(
                 type: 2, // Button
                 style: 3, // Success (green)
                 label: "Approve",
-                custom_id: `approve:${approval.approveToken}`,
+                custom_id: `approve:${shortId}`,
               },
               {
                 type: 2, // Button
                 style: 4, // Danger (red)
                 label: "Reject",
-                custom_id: `reject:${approval.approveToken}`,
+                custom_id: `reject:${shortId}`,
               },
             ],
           },
@@ -112,8 +131,7 @@ export function createDiscordSender(
 
   const startBot = async (botToken: string) => {
     // Dynamic import — discord.js is an optional dependency
-    // @ts-expect-error — installed separately when Discord integration is configured
-    const { Client, GatewayIntentBits } = await import("discord.js");
+    const { Client, GatewayIntentBits } = await import("discord.js" as string);
 
     client = new Client({
       intents: [GatewayIntentBits.Guilds],
@@ -128,14 +146,24 @@ export function createDiscordSender(
 
       if (!i.isButton()) return;
 
-      const [action, token] = i.customId.split(":");
-      if (!token || !resolveApproval) return;
+      const [action, shortId] = i.customId.split(":");
+      if (!shortId || !resolveApproval) return;
+
+      const token = pendingTokens.get(shortId);
+      if (!token) {
+        await i.reply({
+          content: "This approval has expired or is invalid.",
+          ephemeral: true,
+        });
+        return;
+      }
 
       const decision =
         action === "approve" ? "approved" : ("rejected" as const);
       const result = resolveApproval(token, decision);
 
       if (result) {
+        pendingTokens.delete(shortId);
         await i.reply({
           content: `${decision === "approved" ? "Approved" : "Rejected"} job ${result.jobId} step ${result.stepIndex}`,
           ephemeral: true,

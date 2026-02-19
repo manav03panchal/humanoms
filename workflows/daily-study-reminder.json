@@ -1,0 +1,28 @@
+{
+  "name": "daily_study_reminder",
+  "description": "Send daily Discord reminder with pending study tasks",
+  "steps": [
+    {
+      "name": "get_study_tasks",
+      "tool": "list_tasks",
+      "server": "internal",
+      "input": {
+        "tags": ["study"],
+        "status": "pending",
+        "due_before": "{{today_end}}"
+      },
+      "trust_level": "auto",
+      "output_mapping": { "tasks": "due_tasks" }
+    },
+    {
+      "name": "send_reminder",
+      "tool": "send_message",
+      "server": "discord",
+      "input": {
+        "channelId": "{{discord.default_channel}}",
+        "content": "Good morning! You have {{due_tasks.length}} study tasks due today:\n{{format_task_list(due_tasks)}}"
+      },
+      "trust_level": "auto"
+    }
+  ]
+}

@@ -1,0 +1,13 @@
+services:
+  humanoms:
+    build: .
+    ports:
+      - "3747:3747"
+    volumes:
+      - humanoms-data:/app/data
+    environment:
+      - HUMANOMS_MASTER_KEY=${HUMANOMS_MASTER_KEY}
+    restart: unless-stopped
+
+volumes:
+  humanoms-data:

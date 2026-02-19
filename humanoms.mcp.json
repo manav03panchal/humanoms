@@ -1,0 +1,12 @@
+{
+  "mcpServers": {
+    "humanoms": {
+      "command": "bun",
+      "args": ["run", "src/index.ts", "--mcp"],
+      "env": {
+        "HUMANOMS_DB_PATH": "./data/humanoms.db",
+        "HUMANOMS_MASTER_KEY": "${HUMANOMS_MASTER_KEY}"
+      }
+    }
+  }
+}

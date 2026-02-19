@@ -1,0 +1,49 @@
+{
+  "name": "parse_and_summarize_pdfs",
+  "description": "Extract text from PDFs, generate study summaries, notify on Discord",
+  "steps": [
+    {
+      "name": "extract_text",
+      "tool": "read_pdf",
+      "server": "pdf-reader",
+      "input": { "filePath": "{{file.path}}" },
+      "trust_level": "auto",
+      "timeout_ms": 30000,
+      "output_mapping": { "text": "extracted_text" }
+    },
+    {
+      "name": "generate_summary",
+      "tool": "llm_call",
+      "server": "internal",
+      "input": {
+        "system": "You are a study assistant. Create a concise summary with key takeaways, important definitions, and potential exam topics.",
+        "prompt": "Summarize this document:\n\n{{extracted_text}}",
+        "model": "sonnet"
+      },
+      "trust_level": "auto",
+      "output_mapping": { "response": "summary" }
+    },
+    {
+      "name": "save_summary",
+      "tool": "create_entity",
+      "server": "internal",
+      "input": {
+        "type": "study_summary",
+        "name": "Summary: {{file.name}}",
+        "properties": { "summary": "{{summary}}", "source_file_id": "{{file.id}}" },
+        "tags": ["auto-generated", "study"]
+      },
+      "trust_level": "notify"
+    },
+    {
+      "name": "notify_complete",
+      "tool": "send_message",
+      "server": "discord",
+      "input": {
+        "channelId": "{{discord.default_channel}}",
+        "content": "Finished reading **{{file.name}}**.\n\n**Key points:**\n{{summary}}"
+      },
+      "trust_level": "auto"
+    }
+  ]
+}

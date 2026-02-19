@@ -1,0 +1,80 @@
+{
+  "name": "blog_post_from_notes",
+  "description": "Compile tagged notes into a blog post, research context, create GitHub PR",
+  "steps": [
+    {
+      "name": "gather_notes",
+      "tool": "search_entities",
+      "server": "internal",
+      "input": { "tags": ["blog-draft"], "type": "study_note" },
+      "trust_level": "auto",
+      "output_mapping": { "entities": "source_notes" }
+    },
+    {
+      "name": "research_context",
+      "tool": "web_search_exa",
+      "server": "exa",
+      "input": { "query": "{{source_notes.0.name}}", "numResults": 5 },
+      "trust_level": "auto",
+      "output_mapping": { "results": "research" }
+    },
+    {
+      "name": "draft_post",
+      "tool": "llm_call",
+      "server": "internal",
+      "input": {
+        "system": "You are a technical blog writer. Write engaging, well-structured posts.",
+        "prompt": "Write a blog post based on these notes:\n\n{{source_notes}}\n\nSupporting research:\n{{research}}",
+        "model": "opus"
+      },
+      "trust_level": "auto",
+      "output_mapping": { "response": "blog_content" }
+    },
+    {
+      "name": "preview_and_approve",
+      "tool": "noop",
+      "server": "internal",
+      "input": { "preview": "{{blog_content}}" },
+      "trust_level": "approve"
+    },
+    {
+      "name": "push_to_github",
+      "tool": "create_or_update_file",
+      "server": "github",
+      "input": {
+        "owner": "{{github.owner}}",
+        "repo": "{{github.blog_repo}}",
+        "path": "content/posts/{{slugify(source_notes.0.name)}}.md",
+        "content": "{{blog_content}}",
+        "message": "Add blog post: {{source_notes.0.name}}",
+        "branch": "draft/{{slugify(source_notes.0.name)}}"
+      },
+      "trust_level": "approve"
+    },
+    {
+      "name": "create_pr",
+      "tool": "create_pull_request",
+      "server": "github",
+      "input": {
+        "owner": "{{github.owner}}",
+        "repo": "{{github.blog_repo}}",
+        "title": "New post: {{source_notes.0.name}}",
+        "body": "Auto-generated from HumanOMS study notes.",
+        "head": "draft/{{slugify(source_notes.0.name)}}",
+        "base": "main"
+      },
+      "trust_level": "approve",
+      "output_mapping": { "html_url": "pr_url" }
+    },
+    {
+      "name": "notify_complete",
+      "tool": "send_message",
+      "server": "discord",
+      "input": {
+        "channelId": "{{discord.default_channel}}",
+        "content": "Blog post PR ready for review: {{pr_url}}"
+      },
+      "trust_level": "auto"
+    }
+  ]
+}

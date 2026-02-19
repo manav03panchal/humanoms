@@ -75,18 +75,15 @@ export class JobQueue {
 
       if (!row) return null;
 
+      const now = new Date().toISOString();
       this.db
         .query(
-          `UPDATE jobs SET status = 'running', started_at = datetime('now') WHERE id = ?`
+          `UPDATE jobs SET status = 'running', started_at = ? WHERE id = ?`
         )
-        .run(row.id);
+        .run(now, row.id);
 
-      // Re-fetch to get updated fields
-      const updated = this.db
-        .query(`SELECT * FROM jobs WHERE id = ?`)
-        .get(row.id) as JobRow;
-
-      return parseJobRow(updated);
+      // Construct Job from original row + known updates (avoids re-SELECT)
+      return parseJobRow({ ...row, status: "running", started_at: now });
     });
 
     return tx();

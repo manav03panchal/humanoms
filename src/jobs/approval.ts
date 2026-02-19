@@ -78,17 +78,27 @@ export class ApprovalManager {
       return null;
     }
 
-    // Update status
+    // Update approval status
     this.db
       .query(
         `UPDATE approvals SET status = ?, responded_at = datetime('now'), responded_via = 'api' WHERE id = ?`
       )
       .run(decision, row.id);
 
-    log.info(
-      { approvalId: row.id, decision },
-      "Approval resolved"
-    );
+    // Re-queue or fail the job based on the decision
+    if (decision === "approved") {
+      this.db
+        .query(`UPDATE jobs SET status = 'queued' WHERE id = ? AND status = 'awaiting_approval'`)
+        .run(row.job_id);
+      log.info({ approvalId: row.id, jobId: row.job_id }, "Approval granted — job re-queued");
+    } else {
+      this.db
+        .query(
+          `UPDATE jobs SET status = 'failed', error = 'Rejected via approval', completed_at = datetime('now') WHERE id = ? AND status = 'awaiting_approval'`
+        )
+        .run(row.job_id);
+      log.info({ approvalId: row.id, jobId: row.job_id }, "Approval rejected — job failed");
+    }
 
     return { jobId: row.job_id, stepIndex: row.step_index };
   }

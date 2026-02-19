@@ -34,12 +34,7 @@ function ask(question: string): Promise<string> {
 }
 
 function askSecret(question: string): Promise<string> {
-  return new Promise((resolve) => {
-    process.stdout.write(question);
-    // Note: In a real terminal, we'd disable echo here.
-    // For Bun/Node readline, the input is visible.
-    rl.question("", (answer) => resolve(answer.trim()));
-  });
+  return ask(question);
 }
 
 async function main() {
@@ -119,6 +114,9 @@ async function main() {
     console.log("  Stored.");
   }
 
+  // NOTE: No Anthropic API key needed — LLM calls use the Claude Agent SDK
+  // which runs through your Claude Max subscription automatically.
+
   // Step 5: Register default MCP tool servers
   console.log("\n  Registering MCP tool servers...\n");
 
@@ -162,13 +160,14 @@ async function main() {
   }
 
   // Step 6: Write .env file
+  // NOTE: API key hash is stored ONLY in the database (via SecretStore above).
+  // Bun's .env parser expands $ even inside quotes, which destroys Argon2 hashes.
   console.log("\n  Generating .env file...");
   const envContent = `# HumanOMS Configuration
 HUMANOMS_PORT=3747
 HUMANOMS_HOST=localhost
 HUMANOMS_DB_PATH=${dbPath}
 HUMANOMS_MASTER_KEY=${passphrase}
-HUMANOMS_API_KEY_HASH=${apiKeyHash}
 HUMANOMS_LOG_LEVEL=info
 `;
 
