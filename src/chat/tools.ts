@@ -232,6 +232,22 @@ export function buildChatTools(
       }
     ),
 
+    tool(
+      "delete_task",
+      "Delete one or more tasks by ID.",
+      { task_ids: z.array(z.string().min(1)).min(1) },
+      async (params) => {
+        const deleted: string[] = [];
+        for (const id of params.task_ids) {
+          const existing = db.query("SELECT id FROM tasks WHERE id = ?").get(id);
+          if (!existing) continue;
+          db.run("DELETE FROM tasks WHERE id = ?", [id]);
+          deleted.push(id);
+        }
+        return json({ deleted_count: deleted.length, deleted_ids: deleted });
+      }
+    ),
+
     // ── Entities ───────────────────────────────────────────────────────
 
     tool(
@@ -310,6 +326,67 @@ export function buildChatTools(
           )
           .all(params.query) as Record<string, unknown>[];
         return json(rows.map(deserializeEntity));
+      }
+    ),
+
+    tool(
+      "get_entity",
+      "Get a single entity by ID",
+      { id: z.string().min(1) },
+      async (params) => {
+        const row = db.query("SELECT * FROM entities WHERE id = ?").get(params.id);
+        if (!row) return jsonError("Entity not found");
+        return json(deserializeEntity(row));
+      }
+    ),
+
+    tool(
+      "update_entity",
+      "Update an existing entity's name, type, properties, or tags",
+      {
+        id: z.string().min(1),
+        name: z.string().min(1).max(500).optional(),
+        type: z.string().min(1).max(100).optional(),
+        properties: z.record(z.string(), z.unknown()).optional(),
+        tags: z.array(z.string()).optional(),
+      },
+      async (params) => {
+        const existing = db.query("SELECT * FROM entities WHERE id = ?").get(params.id);
+        if (!existing) return jsonError("Entity not found");
+
+        const sets: string[] = ["updated_at = ?"];
+        const values: SQLQueryBindings[] = [new Date().toISOString()];
+        const { id, ...updates } = params;
+        for (const [key, value] of Object.entries(updates)) {
+          if (value !== undefined && ENTITY_COLUMN_ALLOWLIST.has(key)) {
+            sets.push(`${key} = ?`);
+            values.push(
+              key === "properties" || key === "tags"
+                ? JSON.stringify(value)
+                : (value as SQLQueryBindings)
+            );
+          }
+        }
+        values.push(id);
+        db.run(`UPDATE entities SET ${sets.join(", ")} WHERE id = ?`, values);
+        const row = db.query("SELECT * FROM entities WHERE id = ?").get(id);
+        return json(deserializeEntity(row));
+      }
+    ),
+
+    tool(
+      "delete_entity",
+      "Delete one or more entities by ID.",
+      { entity_ids: z.array(z.string().min(1)).min(1) },
+      async (params) => {
+        const deleted: string[] = [];
+        for (const id of params.entity_ids) {
+          const existing = db.query("SELECT id FROM entities WHERE id = ?").get(id);
+          if (!existing) continue;
+          db.run("DELETE FROM entities WHERE id = ?", [id]);
+          deleted.push(id);
+        }
+        return json({ deleted_count: deleted.length, deleted_ids: deleted });
       }
     ),
 
@@ -499,6 +576,23 @@ export function buildChatTools(
           .get(params.job_id);
         if (!row) return jsonError("Job not found");
         return json(deserializeJob(row));
+      }
+    ),
+
+    tool(
+      "delete_job",
+      "Delete one or more jobs by ID. Also deletes linked approvals.",
+      { job_ids: z.array(z.string().min(1)).min(1) },
+      async (params) => {
+        const deleted: string[] = [];
+        for (const id of params.job_ids) {
+          const existing = db.query("SELECT id FROM jobs WHERE id = ?").get(id);
+          if (!existing) continue;
+          db.run("DELETE FROM approvals WHERE job_id = ?", [id]);
+          db.run("DELETE FROM jobs WHERE id = ?", [id]);
+          deleted.push(id);
+        }
+        return json({ deleted_count: deleted.length, deleted_ids: deleted });
       }
     ),
 
@@ -727,6 +821,55 @@ export function buildChatTools(
         sql += " ORDER BY created_at DESC";
         const rows = db.query(sql).all(...sqlParams) as Record<string, unknown>[];
         return json(rows.map(deserializeAutomation));
+      }
+    ),
+    tool(
+      "update_automation",
+      "Update an automation's name, description, cron_expression, or enabled status.",
+      {
+        id: z.string().min(1),
+        name: z.string().min(1).optional(),
+        description: z.string().optional(),
+        cron_expression: z.string().min(1).optional(),
+        enabled: z.boolean().optional(),
+      },
+      async (params) => {
+        const existing = db.query("SELECT * FROM automations WHERE id = ?").get(params.id);
+        if (!existing) return jsonError("Automation not found");
+
+        const sets: string[] = [];
+        const values: SQLQueryBindings[] = [];
+        if (params.name) { sets.push("name = ?"); values.push(params.name); }
+        if (params.description !== undefined) { sets.push("description = ?"); values.push(params.description); }
+        if (params.cron_expression) { sets.push("cron_expression = ?"); values.push(params.cron_expression); }
+        if (params.enabled !== undefined) { sets.push("enabled = ?"); values.push(params.enabled ? 1 : 0); }
+        if (sets.length === 0) return jsonError("No fields to update");
+
+        values.push(params.id);
+        db.run(`UPDATE automations SET ${sets.join(", ")} WHERE id = ?`, values);
+        const row = db.query("SELECT * FROM automations WHERE id = ?").get(params.id) as any;
+        if (scheduler && row) {
+          if (row.enabled === 1) scheduler.schedule(row);
+          else scheduler.unschedule(params.id);
+        }
+        return json(deserializeAutomation(row));
+      }
+    ),
+
+    tool(
+      "delete_automation",
+      "Delete one or more automations by ID.",
+      { automation_ids: z.array(z.string().min(1)).min(1) },
+      async (params) => {
+        const deleted: string[] = [];
+        for (const id of params.automation_ids) {
+          const existing = db.query("SELECT id FROM automations WHERE id = ?").get(id);
+          if (!existing) continue;
+          db.run("DELETE FROM automations WHERE id = ?", [id]);
+          if (scheduler) scheduler.unschedule(id);
+          deleted.push(id);
+        }
+        return json({ deleted_count: deleted.length, deleted_ids: deleted });
       }
     ),
   ];

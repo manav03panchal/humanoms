@@ -2,6 +2,7 @@ import { html, render, useState, useEffect, useRef } from '/lib/preact.js';
 import { api } from '/api.js';
 import { ToastContainer, showToast } from '/components/toast.js';
 import { MessageList, InputBar } from '/components/chat.js';
+import { Dashboard } from '/components/dashboard.js';
 
 const ICONS = {
   plus: '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><line x1="12" y1="5" x2="12" y2="19"/><line x1="5" y1="12" x2="19" y2="12"/></svg>',
@@ -60,17 +61,8 @@ function ChatView() {
   const [isStreaming, setIsStreaming] = useState(false);
   const [currentAssistantMessage, setCurrentAssistantMessage] = useState('');
   const [currentToolCalls, setCurrentToolCalls] = useState([]);
-  const [theme, setTheme] = useState(getInitialTheme);
+  const [isThinking, setIsThinking] = useState(false);
   const abortRef = useRef(null);
-
-  useEffect(() => {
-    document.documentElement.dataset.theme = theme;
-    localStorage.setItem('humanoms_theme', theme);
-  }, [theme]);
-
-  function toggleTheme() {
-    setTheme(t => t === 'dark' ? 'light' : 'dark');
-  }
 
   function handleNewChat() {
     if (isStreaming && abortRef.current) {
@@ -88,6 +80,7 @@ function ChatView() {
     setIsStreaming(true);
     setCurrentAssistantMessage('');
     setCurrentToolCalls([]);
+    setIsThinking(false);
 
     const controller = new AbortController();
     abortRef.current = controller;
@@ -129,17 +122,19 @@ function ChatView() {
         buffer = lines.pop() || '';
 
         let eventType = null;
+        let dataLines = [];
         for (const line of lines) {
           if (line.startsWith('event: ')) {
             eventType = line.slice(7).trim();
+            dataLines = [];
           } else if (line.startsWith('data: ')) {
-            const data = line.slice(6);
-            if (eventType) {
-              processSSEEvent(eventType, data);
-              eventType = null;
-            }
+            dataLines.push(line.slice(6));
           } else if (line === '') {
+            if (eventType && dataLines.length > 0) {
+              processSSEEvent(eventType, dataLines.join('\n'));
+            }
             eventType = null;
+            dataLines = [];
           }
         }
       }
@@ -147,16 +142,23 @@ function ChatView() {
       if (buffer.trim()) {
         const remaining = buffer.split('\n');
         let eventType = null;
+        let dataLines = [];
         for (const line of remaining) {
           if (line.startsWith('event: ')) {
             eventType = line.slice(7).trim();
+            dataLines = [];
           } else if (line.startsWith('data: ')) {
-            const data = line.slice(6);
-            if (eventType) {
-              processSSEEvent(eventType, data);
-              eventType = null;
+            dataLines.push(line.slice(6));
+          } else if (line === '') {
+            if (eventType && dataLines.length > 0) {
+              processSSEEvent(eventType, dataLines.join('\n'));
             }
+            eventType = null;
+            dataLines = [];
           }
+        }
+        if (eventType && dataLines.length > 0) {
+          processSSEEvent(eventType, dataLines.join('\n'));
         }
       }
     } catch (err) {
@@ -174,6 +176,7 @@ function ChatView() {
       },
     ]);
     setIsStreaming(false);
+    setIsThinking(false);
     setCurrentAssistantMessage('');
     setCurrentToolCalls([]);
     abortRef.current = null;
@@ -184,7 +187,12 @@ function ChatView() {
           setConversationId(rawData.trim());
           break;
 
+        case 'thinking':
+          setIsThinking(true);
+          break;
+
         case 'text':
+          setIsThinking(false);
           assistantText += rawData;
           setCurrentAssistantMessage(assistantText);
           break;
@@ -226,9 +234,31 @@ function ChatView() {
     }
   }
 
-  function handleLogout() {
-    api.setToken(null);
-    window.location.reload();
+  return html`
+    <div class="chat-view">
+      <${MessageList}
+        messages=${messages}
+        isStreaming=${isStreaming}
+        isThinking=${isThinking}
+        currentAssistantMessage=${currentAssistantMessage}
+        currentToolCalls=${currentToolCalls}
+      />
+      <${InputBar} onSend=${handleSend} disabled=${isStreaming} />
+    </div>
+  `;
+}
+
+function MainView({ onLogout }) {
+  const [tab, setTab] = useState('chat');
+  const [theme, setTheme] = useState(getInitialTheme);
+
+  useEffect(() => {
+    document.documentElement.dataset.theme = theme;
+    localStorage.setItem('humanoms_theme', theme);
+  }, [theme]);
+
+  function toggleTheme() {
+    setTheme(t => t === 'dark' ? 'light' : 'dark');
   }
 
   const themeIcon = theme === 'dark' ? ICONS.sun : ICONS.moon;
@@ -236,20 +266,22 @@ function ChatView() {
   return html`
     <div class="chat-layout">
       <div class="top-bar">
-        <div class="top-bar-title">HumanOMS</div>
+        <div class="top-bar-left">
+          <div class="top-bar-title">HumanOMS</div>
+          <div class="tab-bar">
+            <button class="tab-btn ${tab === 'chat' ? 'active' : ''}" onClick=${() => setTab('chat')}>Chat</button>
+            <button class="tab-btn ${tab === 'dashboard' ? 'active' : ''}" onClick=${() => setTab('dashboard')}>Dashboard</button>
+          </div>
+        </div>
         <div class="top-bar-actions">
           <button class="icon-btn" onClick=${toggleTheme} title="Toggle theme" dangerouslySetInnerHTML=${{ __html: themeIcon }} />
-          <button class="icon-btn" onClick=${handleNewChat} title="New chat" dangerouslySetInnerHTML=${{ __html: ICONS.plus }} />
-          <button class="icon-btn" onClick=${handleLogout} title="Logout" dangerouslySetInnerHTML=${{ __html: ICONS.logOut }} />
+          ${tab === 'chat' && html`
+            <button class="icon-btn" title="New chat" dangerouslySetInnerHTML=${{ __html: ICONS.plus }} />
+          `}
+          <button class="icon-btn" onClick=${onLogout} title="Logout" dangerouslySetInnerHTML=${{ __html: ICONS.logOut }} />
         </div>
       </div>
-      <${MessageList}
-        messages=${messages}
-        isStreaming=${isStreaming}
-        currentAssistantMessage=${currentAssistantMessage}
-        currentToolCalls=${currentToolCalls}
-      />
-      <${InputBar} onSend=${handleSend} disabled=${isStreaming} />
+      ${tab === 'chat' ? html`<${ChatView} />` : html`<${Dashboard} />`}
       <${ToastContainer} />
     </div>
   `;
@@ -259,7 +291,6 @@ function App() {
   const [authed, setAuthed] = useState(false);
   const [checking, setChecking] = useState(true);
 
-  // Apply saved theme on initial load
   useEffect(() => {
     const saved = localStorage.getItem('humanoms_theme') || 'dark';
     document.documentElement.dataset.theme = saved;
@@ -279,6 +310,11 @@ function App() {
     })();
   }, []);
 
+  function handleLogout() {
+    api.setToken(null);
+    window.location.reload();
+  }
+
   if (checking) {
     return html`<div class="loading">Loading...</div>`;
   }
@@ -287,7 +323,7 @@ function App() {
     return html`<${LoginGate} onLogin=${() => setAuthed(true)} />`;
   }
 
-  return html`<${ChatView} />`;
+  return html`<${MainView} onLogout=${handleLogout} />`;
 }
 
 render(html`<${App} />`, document.getElementById('app'));

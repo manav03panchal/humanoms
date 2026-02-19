@@ -15,8 +15,9 @@ function mdToHtml(text) {
     .replace(/>/g, '&gt;');
 
   // Code blocks
-  s = s.replace(/```(\w*)\n([\s\S]*?)```/g, (_, _lang, code) => {
-    return `<pre><code>${code.trim()}</code></pre>`;
+  s = s.replace(/```(\w*)\n([\s\S]*?)```/g, (_, lang, code) => {
+    const langLabel = lang ? `<span class="code-lang">${lang}</span>` : '';
+    return `<div class="code-block">${langLabel}<button class="code-copy" onclick="navigator.clipboard.writeText(this.nextElementSibling.textContent).then(()=>{this.textContent='copied';setTimeout(()=>this.textContent='copy',1500)})">copy</button><pre><code>${code.trim()}</code></pre></div>`;
   });
 
   // Inline code
@@ -82,7 +83,7 @@ function mdToHtml(text) {
   return s;
 }
 
-export function MessageList({ messages, isStreaming, currentAssistantMessage, currentToolCalls }) {
+export function MessageList({ messages, isStreaming, isThinking, currentAssistantMessage, currentToolCalls }) {
   const listRef = useRef(null);
   const autoScrollRef = useRef(true);
 
@@ -124,7 +125,15 @@ export function MessageList({ messages, isStreaming, currentAssistantMessage, cu
           streaming=${true}
         />
       `}
-      ${isStreaming && !currentAssistantMessage && currentToolCalls.length === 0 && html`
+      ${isStreaming && isThinking && html`
+        <div class="thinking-indicator">
+          <span class="thinking-label">thinking</span>
+          <div class="typing-dot" />
+          <div class="typing-dot" />
+          <div class="typing-dot" />
+        </div>
+      `}
+      ${isStreaming && !isThinking && !currentAssistantMessage && currentToolCalls.length === 0 && html`
         <div class="typing-indicator">
           <div class="typing-dot" />
           <div class="typing-dot" />

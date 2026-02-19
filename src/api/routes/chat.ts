@@ -108,15 +108,25 @@ export function createChatRoutes(db: Database, scheduler?: Scheduler) {
       });
 
       try {
+        const wantsThinking = /\bthink\b/i.test(body.message);
         const conversation = query({
           prompt: conversationText,
           options: {
             systemPrompt,
             mcpServers: { "humanoms-tools": mcpServer },
-            allowedTools: baseTools.map((t: any) => `mcp__humanoms-tools__${t.name}`),
+            allowedTools: [
+              ...baseTools.map((t: any) => `mcp__humanoms-tools__${t.name}`),
+              "WebSearch",
+              "WebFetch",
+              "Glob",
+              "Grep",
+              "Read",
+            ],
             maxTurns: 25,
             model: "claude-sonnet-4-6",
-            thinking: { type: "disabled" },
+            thinking: wantsThinking
+              ? { type: "enabled", budgetTokens: 10000 }
+              : { type: "disabled" },
             permissionMode: "bypassPermissions",
             allowDangerouslySkipPermissions: true,
             tools: [],
@@ -128,6 +138,9 @@ export function createChatRoutes(db: Database, scheduler?: Scheduler) {
           if (msg.type === "assistant") {
             for (const block of (msg as any).message.content) {
               if (stream.aborted) break;
+              if (block.type === "thinking" && block.thinking) {
+                await stream.writeSSE({ event: "thinking", data: block.thinking });
+              }
               if (block.type === "tool_use") {
                 // Strip the MCP prefix for cleaner display
                 const cleanName = block.name.replace(/^mcp__humanoms-tools__/, "");

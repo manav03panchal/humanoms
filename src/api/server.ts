@@ -13,6 +13,7 @@ import { automationsRoutes } from "./routes/automations.ts";
 import { filesRoutes } from "./routes/files.ts";
 import { jobsRoutes } from "./routes/jobs.ts";
 import { createChatRoutes } from "./routes/chat.ts";
+import { dashboardRoutes } from "./routes/dashboard.ts";
 
 import type { Scheduler } from "../scheduler/scheduler.ts";
 
@@ -50,6 +51,7 @@ export function createApp(config: AppConfig) {
   app.route("/api/v1/files", filesRoutes(config.db));
   app.route("/api/v1/jobs", jobsRoutes(config.db));
   app.route("/api/v1", createChatRoutes(config.db, config.scheduler));
+  app.route("/api/v1/dashboard", dashboardRoutes(config.db));
 
   // Root redirect
   app.get("/", (c) => c.redirect("/index.html"));
