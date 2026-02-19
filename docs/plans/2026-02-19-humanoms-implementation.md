@@ -6,9 +6,20 @@
 
 **Architecture:** Single Bun process running Hono REST API + MCP server (inbound) + MCP client pool (outbound) + SQLite-backed job queue + croner scheduler. Claude Agent SDK for LLM calls using the user's Max subscription. Discord bot for notifications and interactive approval buttons.
 
-**Tech Stack:** Bun, TypeScript, Hono, SQLite (`bun:sqlite`), `@modelcontextprotocol/sdk`, `@anthropic-ai/claude-agent-sdk`, `croner`, `zod`, `ulidx`, `discord.js`, `pino`, `@node-rs/argon2`
+**Tech Stack:** Bun, TypeScript, Hono, SQLite (`bun:sqlite`), `@modelcontextprotocol/sdk@1.26.0`, `@anthropic-ai/claude-agent-sdk@0.2.47`, `croner@10`, `zod@3`, `ulidx`, `discord.js@14`, `pino`, `@node-rs/argon2`
 
 **Design Doc:** `docs/plans/2026-02-19-humanoms-design.md`
+
+### Grounding Corrections (2026-02-19)
+
+These corrections were verified against actual package docs via Context7:
+
+1. **MCP SDK**: Use v1 deep imports (`@modelcontextprotocol/sdk/server/mcp.js`, `@modelcontextprotocol/sdk/client/index.js`). v2 package (`@modelcontextprotocol/server`) is NOT published yet.
+2. **MCP Tool Registration**: Use `server.tool()` with raw zod shapes (NOT `server.registerTool()` which is v2-only).
+3. **Zod**: Stay on v3 — MCP SDK v1 depends on it. v4 only needed when MCP v2 ships.
+4. **Claude Agent SDK**: Use `unstable_v2_prompt()` for one-shot LLM calls (cleaner than v1 `query()` generator). Falls back to `query()` if v2 is removed.
+5. **Discord.js**: Use `channel.send()` + global `interactionCreate` listener pattern (NOT slash-command reply pattern). Custom IDs encode approval tokens.
+6. **Croner**: Confirmed working exactly as planned. `new Cron("0 8 * * *", callback)`.
 
 ---
 
