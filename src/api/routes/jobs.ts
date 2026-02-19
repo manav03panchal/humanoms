@@ -116,9 +116,12 @@ export function jobsRoutes(db: Database) {
       ["approved", now, approval.id as string]
     );
 
+    // Advance current_step past the approval gate so executor resumes from the next step
+    const jobRow = job as Record<string, unknown>;
+    const nextStep = (jobRow.current_step as number) + 1;
     db.run(
-      "UPDATE jobs SET status = ? WHERE id = ?",
-      ["queued", jobId]
+      "UPDATE jobs SET status = ?, current_step = ? WHERE id = ?",
+      ["queued", nextStep, jobId]
     );
 
     const updatedJob = db
