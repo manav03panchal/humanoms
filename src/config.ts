@@ -4,7 +4,7 @@ const ConfigSchema = z.object({
   port: z.coerce.number().int().positive().default(3747),
   host: z.string().default("localhost"),
   dbPath: z.string().default("./data/humanoms.db"),
-  masterKey: z.string().min(1, "HUMANOMS_MASTER_KEY is required"),
+  masterKey: z.string().default("dev-insecure-key"),
   apiKeyHash: z.string().optional(),
   logLevel: z
     .enum(["fatal", "error", "warn", "info", "debug", "trace", "silent"])

@@ -6,6 +6,10 @@ import { auditMiddleware } from "./middleware/audit.ts";
 import { AuditLog } from "../security/audit.ts";
 import { tasksRoutes } from "./routes/tasks.ts";
 import { entitiesRoutes } from "./routes/entities.ts";
+import { workflowsRoutes } from "./routes/workflows.ts";
+import { automationsRoutes } from "./routes/automations.ts";
+import { filesRoutes } from "./routes/files.ts";
+import { jobsRoutes } from "./routes/jobs.ts";
 
 interface AppConfig {
   db: Database;
@@ -36,6 +40,10 @@ export function createApp(config: AppConfig) {
   // Mount routes
   app.route("/api/v1/tasks", tasksRoutes(config.db));
   app.route("/api/v1/entities", entitiesRoutes(config.db));
+  app.route("/api/v1/workflows", workflowsRoutes(config.db));
+  app.route("/api/v1/automations", automationsRoutes(config.db));
+  app.route("/api/v1/files", filesRoutes(config.db));
+  app.route("/api/v1/jobs", jobsRoutes(config.db));
 
   // 404 fallback
   app.notFound((c) => {
