@@ -34,7 +34,7 @@ It is not a todo app. It is not a notes app. It is the operating system for your
 | Scheduler | `croner` | Zero-dep cron library, works natively with Bun |
 | Validation | Zod | Runtime type validation for all inputs |
 | IDs | ULID | Sortable, unique, no coordination needed |
-| LLM | `@anthropic-ai/claude-code` | Claude Code SDK — uses Max subscription, no API key needed |
+| LLM | `@anthropic-ai/claude-agent-sdk` | Claude Code SDK — uses Max subscription, no API key needed |
 
 ### External MCP Tools
 
@@ -793,7 +793,7 @@ $ bun run src/index.ts
 
 ### No API Key Required
 
-HumanOMS uses `@anthropic-ai/claude-code` — the official Claude Code SDK. Since the user is on the Max plan, all LLM calls go through the existing subscription. No separate Anthropic API key needed.
+HumanOMS uses `@anthropic-ai/claude-agent-sdk` — the official Claude Code SDK. Since the user is on the Max plan, all LLM calls go through the existing subscription. No separate Anthropic API key needed.
 
 ### Smart Model Routing
 
@@ -814,7 +814,7 @@ Auto-routing heuristics:
 ### Implementation
 
 ```typescript
-import { claude } from "@anthropic-ai/claude-code";
+import { query } from "@anthropic-ai/claude-agent-sdk";
 
 async function llmCall(input: {
   system?: string;
@@ -831,16 +831,25 @@ async function llmCall(input: {
     opus: "claude-opus-4-6",
   };
 
-  const result = await claude({
-    prompt: input.prompt,
+  const fullPrompt = input.system
+    ? `${input.system}\n\n${input.prompt}`
+    : input.prompt;
+
+  let result = "";
+  for await (const message of query({
+    prompt: fullPrompt,
     options: {
       model: modelMap[model],
-      systemPrompt: input.system,
       maxTurns: 1,
+      allowedTools: [],       // Pure LLM call, no tool use
     },
-  });
+  })) {
+    if ("result" in message) {
+      result = message.result;
+    }
+  }
 
-  return result.stdout;
+  return result;
 }
 ```
 
