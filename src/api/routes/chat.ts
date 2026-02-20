@@ -3,8 +3,7 @@ import { streamSSE } from "hono/streaming";
 import type { Database } from "bun:sqlite";
 import { buildChatTools } from "../../chat/tools.ts";
 import { buildSystemPrompt } from "../../chat/system-prompt.ts";
-import { runAgentLoop } from "../../chat/agent-loop.ts";
-import type { ChatProvider } from "../../chat/providers/types.ts";
+import type { AgentLoopRunner } from "../../chat/agent-loop.ts";
 import type { ChatMessage } from "../../chat/providers/types.ts";
 import { generateId } from "../../lib/ulid.ts";
 import { createChildLogger } from "../../lib/logger.ts";
@@ -15,7 +14,7 @@ import type { Scheduler } from "../../scheduler/scheduler.ts";
 
 export function createChatRoutes(
   db: Database,
-  provider: ChatProvider,
+  chatLoop: AgentLoopRunner,
   scheduler?: Scheduler
 ) {
   const app = new Hono();
@@ -70,12 +69,10 @@ export function createChatRoutes(
       const toolCalls: { tool: string; input: unknown; result: unknown }[] = [];
 
       try {
-        for await (const event of runAgentLoop({
-          provider,
+        for await (const event of chatLoop({
           messages,
           tools,
           system: systemPrompt,
-          maxTurns: 25,
           thinking: wantsThinking,
           signal: c.req.raw.signal,
         })) {

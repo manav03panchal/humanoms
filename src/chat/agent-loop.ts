@@ -12,6 +12,16 @@ export type AgentEvent =
   | { type: "tool_call"; name: string; args: unknown }
   | { type: "tool_result"; name: string; result: unknown };
 
+// ── Shared loop runner type ──────────────────────────────────────────────
+
+export type AgentLoopRunner = (params: {
+  messages: ChatMessage[];
+  tools: ToolDefinition[];
+  system: string;
+  thinking?: boolean;
+  signal?: AbortSignal;
+}) => AsyncGenerator<AgentEvent>;
+
 // ── Agent loop ───────────────────────────────────────────────────────────
 
 export async function* runAgentLoop(params: {

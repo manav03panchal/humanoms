@@ -14,7 +14,8 @@ COPY src/ ./src/
 COPY web/ ./web/
 COPY scripts/ ./scripts/
 
-RUN mkdir -p /app/data
+# Make data dir writable by any UID (docker-compose sets user: to match host)
+RUN mkdir -p /app/data && chmod 777 /app/data
 
 ENV HUMANOMS_HOST=0.0.0.0
 ENV HUMANOMS_PORT=3747

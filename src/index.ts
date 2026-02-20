@@ -13,6 +13,9 @@ import { SecretStore } from "./security/secrets.ts";
 import { deriveKey } from "./security/encryption.ts";
 import { ApprovalManager } from "./jobs/approval.ts";
 import { createProvider } from "./chat/providers/index.ts";
+import { runAgentLoop } from "./chat/agent-loop.ts";
+import type { AgentLoopRunner } from "./chat/agent-loop.ts";
+import { runClaudeCodeLoop } from "./chat/claude-code-loop.ts";
 
 const log = createChildLogger("main");
 
@@ -46,23 +49,36 @@ if (process.argv.includes("--mcp")) {
   });
   scheduler.start();
 
-  // ── Chat provider ─────────────────────────────────────────────────
-  if (!config.chatApiKey) {
-    log.warn("No CHAT_API_KEY / ANTHROPIC_API_KEY set — chat will not work");
+  // ── Chat loop runner ─────────────────────────────────────────────
+  let chatLoop: AgentLoopRunner;
+
+  if (config.chatProvider === "claude-code") {
+    log.info("Using Claude Code Agent SDK (OAuth credentials, no API key needed)");
+    const chatModel = config.chatModel;
+    chatLoop = (p) =>
+      runClaudeCodeLoop({ ...p, model: chatModel });
+  } else {
+    if (!config.chatApiKey) {
+      log.warn("No CHAT_API_KEY / ANTHROPIC_API_KEY set — chat will not work");
+    }
+    const provider = createProvider({
+      provider: config.chatProvider as "anthropic" | "openai",
+      apiKey: config.chatApiKey || "",
+      baseUrl: config.chatBaseUrl,
+      model:
+        config.chatModel ||
+        (config.chatProvider === "anthropic" ? "claude-sonnet-4-6" : "gpt-4o"),
+      maxTokens: config.chatMaxTokens,
+    });
+    chatLoop = (p) =>
+      runAgentLoop({ ...p, provider, maxTurns: 25 });
   }
-  const chatProvider = createProvider({
-    provider: config.chatProvider,
-    apiKey: config.chatApiKey || "",
-    baseUrl: config.chatBaseUrl,
-    model: config.chatModel || (config.chatProvider === "anthropic" ? "claude-sonnet-4-6" : "gpt-4o"),
-    maxTokens: config.chatMaxTokens,
-  });
 
   // ── HTTP server ────────────────────────────────────────────────────
   const app = createApp({
     db,
     apiKeyHash,
-    chatProvider,
+    chatLoop,
     scheduler,
   });
 

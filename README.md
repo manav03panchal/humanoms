@@ -2,7 +2,7 @@
 
 Personal operations system. Chat-driven task management, workflow automation, and scheduled jobs with Discord notifications.
 
-**Stack:** Bun + Hono + SQLite + any LLM (Anthropic, OpenAI, DeepSeek, Groq, Kimi, Ollama, etc.)
+**Stack:** Bun + Hono + SQLite + any LLM (Claude Max, Anthropic, OpenAI, DeepSeek, Groq, Kimi, Ollama, etc.)
 
 ## Quick Start (Docker)
 
@@ -23,18 +23,29 @@ Edit `.env` with your values:
 # Required
 HUMANOMS_MASTER_KEY=some-strong-passphrase-here
 
-# Pick your AI provider
-CHAT_PROVIDER=anthropic
-CHAT_API_KEY=sk-ant-your-key-here
+# Pick your AI provider (see "AI Providers" below)
+CHAT_PROVIDER=claude-code
 ```
 
-### 2. Build and run
+### 2. Authenticate (claude-code provider only)
+
+If using `CHAT_PROVIDER=claude-code` (the default), authenticate the Claude Code CLI on your host machine first:
+
+```bash
+npx @anthropic-ai/claude-code claude login
+```
+
+This opens a browser for OAuth. Once authenticated, credentials are stored in `~/.claude/` and `~/.claude.json`. The Docker container mounts these files automatically -- no API key needed.
+
+> **Note:** This requires an active [Claude Max](https://claude.ai/pricing) subscription. If you don't have one, use `anthropic` or `openai` provider with an API key instead.
+
+### 3. Build and run
 
 ```bash
 docker compose up -d --build
 ```
 
-### 3. Set up login
+### 4. Set up login
 
 Generate an API key for the web UI:
 
@@ -44,7 +55,7 @@ docker exec humanoms-humanoms-1 bun run scripts/setup-api-key.ts
 
 This prints a `homs_...` key. **Save it** -- it's shown once and can't be recovered. Paste it into the login screen.
 
-### 4. Open
+### 5. Open
 
 ```
 http://localhost:3747
@@ -53,6 +64,18 @@ http://localhost:3747
 Or from another device on your network: `http://<machine-ip>:3747`
 
 ## AI Providers
+
+### Claude Max (no API key)
+
+Set `CHAT_PROVIDER=claude-code`. Uses the Claude Code Agent SDK with your OAuth credentials from `claude login` -- no API cost beyond your Max subscription.
+
+```env
+CHAT_PROVIDER=claude-code
+```
+
+The Docker container mounts `~/.claude/` and `~/.claude.json` from your host and runs as your host user (so file permissions match). These mounts are read-write because the CLI writes temp/session files.
+
+### API-key providers
 
 Any provider that speaks OpenAI's API format works out of the box. Set these in `.env`:
 
@@ -115,8 +138,10 @@ Requires [Bun](https://bun.sh):
 ```bash
 bun install
 cp .env.example .env   # edit with your values
-bun run index.ts
+bun run src/index.ts
 ```
+
+For the `claude-code` provider, make sure you've run `claude login` first (comes with Claude Code CLI).
 
 Tests:
 

@@ -9,7 +9,7 @@ const ConfigSchema = z.object({
   logLevel: z
     .enum(["fatal", "error", "warn", "info", "debug", "trace", "silent"])
     .default("info"),
-  chatProvider: z.enum(["anthropic", "openai"]).default("anthropic"),
+  chatProvider: z.enum(["anthropic", "openai", "claude-code"]).default("anthropic"),
   chatApiKey: z.string().optional(),
   chatBaseUrl: z.string().optional(),
   chatModel: z.string().optional(),
@@ -19,17 +19,20 @@ const ConfigSchema = z.object({
 export type Config = z.infer<typeof ConfigSchema> & { masterKey: string };
 
 export function loadConfig(): Config {
+  // Filter out empty-string env vars so Zod treats them as undefined
+  const env = (v: string | undefined) => (v === "" ? undefined : v);
+
   const raw = ConfigSchema.parse({
-    port: process.env.HUMANOMS_PORT,
-    host: process.env.HUMANOMS_HOST,
-    dbPath: process.env.HUMANOMS_DB_PATH,
-    masterKey: process.env.HUMANOMS_MASTER_KEY,
-    logLevel: process.env.HUMANOMS_LOG_LEVEL,
-    chatProvider: process.env.CHAT_PROVIDER,
-    chatApiKey: process.env.CHAT_API_KEY || process.env.ANTHROPIC_API_KEY || process.env.OPENAI_API_KEY,
-    chatBaseUrl: process.env.CHAT_BASE_URL,
-    chatModel: process.env.CHAT_MODEL,
-    chatMaxTokens: process.env.CHAT_MAX_TOKENS,
+    port: env(process.env.HUMANOMS_PORT),
+    host: env(process.env.HUMANOMS_HOST),
+    dbPath: env(process.env.HUMANOMS_DB_PATH),
+    masterKey: env(process.env.HUMANOMS_MASTER_KEY),
+    logLevel: env(process.env.HUMANOMS_LOG_LEVEL),
+    chatProvider: env(process.env.CHAT_PROVIDER),
+    chatApiKey: env(process.env.CHAT_API_KEY) || env(process.env.ANTHROPIC_API_KEY) || env(process.env.OPENAI_API_KEY),
+    chatBaseUrl: env(process.env.CHAT_BASE_URL),
+    chatModel: env(process.env.CHAT_MODEL),
+    chatMaxTokens: env(process.env.CHAT_MAX_TOKENS),
   });
 
   let masterKey = raw.masterKey;

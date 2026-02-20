@@ -2,7 +2,7 @@ import { describe, test, expect, beforeEach, afterEach } from "bun:test";
 import { Database } from "bun:sqlite";
 import { applySchema } from "../../src/db/schema.ts";
 import { createApp } from "../../src/api/server.ts";
-import { stubProvider } from "../helpers/stub-provider.ts";
+import { stubChatLoop } from "../helpers/stub-provider.ts";
 import { generateId } from "../../src/lib/ulid.ts";
 
 describe("Automations API", () => {
@@ -13,7 +13,7 @@ describe("Automations API", () => {
   beforeEach(() => {
     db = new Database(":memory:");
     applySchema(db);
-    app = createApp({ db, apiKeyHash: null, chatProvider: stubProvider });
+    app = createApp({ db, apiKeyHash: null, chatLoop: stubChatLoop });
 
     // Insert a workflow to reference
     workflowId = generateId();
