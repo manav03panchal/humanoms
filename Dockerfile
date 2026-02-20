@@ -12,6 +12,7 @@ COPY --from=deps /app/node_modules ./node_modules
 COPY package.json bun.lock tsconfig.json ./
 COPY src/ ./src/
 COPY web/ ./web/
+COPY scripts/ ./scripts/
 
 RUN mkdir -p /app/data
 
