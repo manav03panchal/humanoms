@@ -303,6 +303,7 @@ function buildInternalTools(
     log.info({ command, cwd }, "Running shell command");
     const proc = Bun.spawn(["sh", "-c", command], {
       cwd,
+      env: { ...Bun.env, ...process.env },
       stdout: "pipe",
       stderr: "pipe",
     });

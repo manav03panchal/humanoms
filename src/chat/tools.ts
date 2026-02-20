@@ -700,6 +700,7 @@ export function buildChatTools(
         validateShellCommand(params.command);
         const proc = Bun.spawn(["sh", "-c", params.command], {
           cwd: params.cwd || undefined,
+          env: { ...Bun.env, ...process.env },
           stdout: "pipe",
           stderr: "pipe",
         });
