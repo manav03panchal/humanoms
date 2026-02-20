@@ -17,6 +17,7 @@ RUN mkdir -p /app/data
 
 ENV HUMANOMS_HOST=0.0.0.0
 ENV HUMANOMS_PORT=3747
+ENV NODE_ENV=production
 
 EXPOSE 3747
 
