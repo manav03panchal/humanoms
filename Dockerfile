@@ -9,7 +9,7 @@ RUN bun install --frozen-lockfile --production
 # Final image
 FROM base
 COPY --from=deps /app/node_modules ./node_modules
-COPY package.json bun.lock tsconfig.json index.ts ./
+COPY package.json bun.lock tsconfig.json ./
 COPY src/ ./src/
 COPY web/ ./web/
 
@@ -22,4 +22,4 @@ EXPOSE 3747
 
 VOLUME ["/app/data"]
 
-CMD ["bun", "run", "index.ts"]
+CMD ["bun", "run", "src/index.ts"]
