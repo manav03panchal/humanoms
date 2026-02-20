@@ -230,7 +230,7 @@ function ChatView({ messages, setMessages, conversationId, setConversationId }) 
         currentAssistantMessage=${currentAssistantMessage}
         currentToolCalls=${currentToolCalls}
       />
-      <${InputBar} onSend=${handleSend} disabled=${isStreaming} />
+      <${InputBar} onSend=${handleSend} onStop=${() => abortRef.current?.abort()} disabled=${isStreaming} streaming=${isStreaming} />
     </div>
   `;
 }

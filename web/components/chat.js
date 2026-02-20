@@ -3,6 +3,7 @@ import { renderCard } from '/components/cards.js';
 
 const ICONS = {
   arrowUp: '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><line x1="12" y1="19" x2="12" y2="5"/><polyline points="5 12 12 5 19 12"/></svg>',
+  stop: '<svg viewBox="0 0 24 24" fill="currentColor"><rect x="6" y="6" width="12" height="12" rx="2"/></svg>',
   chevronRight: '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><polyline points="9 18 15 12 9 6"/></svg>',
 };
 
@@ -211,7 +212,7 @@ export function ToolCallBlock({ toolCall }) {
   `;
 }
 
-export function InputBar({ onSend, disabled }) {
+export function InputBar({ onSend, onStop, disabled, streaming }) {
   const [text, setText] = useState('');
   const textareaRef = useRef(null);
 
@@ -251,13 +252,22 @@ export function InputBar({ onSend, disabled }) {
           rows="1"
           disabled=${disabled}
         />
-        <button
-          class="send-btn"
-          onClick=${submit}
-          disabled=${disabled || !text.trim()}
-          title="Send"
-          dangerouslySetInnerHTML=${{ __html: ICONS.arrowUp }}
-        />
+        ${streaming ? html`
+          <button
+            class="send-btn stop-btn"
+            onClick=${onStop}
+            title="Stop"
+            dangerouslySetInnerHTML=${{ __html: ICONS.stop }}
+          />
+        ` : html`
+          <button
+            class="send-btn"
+            onClick=${submit}
+            disabled=${disabled || !text.trim()}
+            title="Send"
+            dangerouslySetInnerHTML=${{ __html: ICONS.arrowUp }}
+          />
+        `}
       </div>
     </div>
   `;
