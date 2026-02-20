@@ -1,9 +1,9 @@
 import { z } from "zod";
-import { tool } from "@anthropic-ai/claude-agent-sdk";
-import type { SdkMcpToolDefinition } from "@anthropic-ai/claude-agent-sdk";
 import type { Database, SQLQueryBindings } from "bun:sqlite";
 import { readFileSync, existsSync, writeFileSync, mkdirSync } from "fs";
 import { dirname } from "path";
+import { defineTool, json, jsonError } from "./tool-def.ts";
+import type { ToolDefinition } from "./tool-def.ts";
 import { generateId } from "../lib/ulid.ts";
 import type { JobQueue } from "../jobs/queue.ts";
 import type { Scheduler } from "../scheduler/scheduler.ts";
@@ -14,19 +14,6 @@ import {
   TASK_COLUMN_ALLOWLIST,
   ENTITY_COLUMN_ALLOWLIST,
 } from "../security/sandbox.ts";
-
-// ── Helpers ──────────────────────────────────────────────────────────────
-
-function json(data: unknown) {
-  return { content: [{ type: "text" as const, text: JSON.stringify(data) }] };
-}
-
-function jsonError(message: string) {
-  return {
-    content: [{ type: "text" as const, text: JSON.stringify({ error: message }) }],
-    isError: true,
-  };
-}
 
 function deserializeTask(row: unknown): Record<string, unknown> {
   const r = row as Record<string, unknown>;
@@ -79,12 +66,11 @@ export function buildChatTools(
   db: Database,
   jobQueue?: JobQueue,
   scheduler?: Scheduler
-): SdkMcpToolDefinition[] {
-  // Each tool() call returns SdkMcpToolDefinition<T> which is covariant with the base type at runtime
-  const tools: any[] = [
+): ToolDefinition[] {
+  const tools: ToolDefinition[] = [
     // ── Tasks ──────────────────────────────────────────────────────────
 
-    tool(
+    defineTool(
       "list_tasks",
       "List tasks with optional filters by status, tag, or due date",
       {
@@ -119,7 +105,7 @@ export function buildChatTools(
       }
     ),
 
-    tool(
+    defineTool(
       "create_task",
       "Create a new task",
       {
@@ -159,7 +145,7 @@ export function buildChatTools(
       }
     ),
 
-    tool(
+    defineTool(
       "get_task",
       "Get a task by ID",
       { id: z.string().min(1) },
@@ -170,7 +156,7 @@ export function buildChatTools(
       }
     ),
 
-    tool(
+    defineTool(
       "update_task",
       "Update an existing task",
       {
@@ -212,7 +198,7 @@ export function buildChatTools(
       }
     ),
 
-    tool(
+    defineTool(
       "complete_task",
       "Mark a task as completed",
       { id: z.string().min(1) },
@@ -232,7 +218,7 @@ export function buildChatTools(
       }
     ),
 
-    tool(
+    defineTool(
       "delete_task",
       "Delete one or more tasks by ID.",
       { task_ids: z.array(z.string().min(1)).min(1) },
@@ -250,7 +236,7 @@ export function buildChatTools(
 
     // ── Entities ───────────────────────────────────────────────────────
 
-    tool(
+    defineTool(
       "list_entities",
       "List entities with optional filters by type or tag",
       {
@@ -278,7 +264,7 @@ export function buildChatTools(
       }
     ),
 
-    tool(
+    defineTool(
       "create_entity",
       "Create a new entity",
       {
@@ -312,7 +298,7 @@ export function buildChatTools(
       }
     ),
 
-    tool(
+    defineTool(
       "search_entities",
       "Full-text search entities using FTS5",
       { query: z.string().min(1) },
@@ -329,7 +315,7 @@ export function buildChatTools(
       }
     ),
 
-    tool(
+    defineTool(
       "get_entity",
       "Get a single entity by ID",
       { id: z.string().min(1) },
@@ -340,7 +326,7 @@ export function buildChatTools(
       }
     ),
 
-    tool(
+    defineTool(
       "update_entity",
       "Update an existing entity's name, type, properties, or tags",
       {
@@ -374,7 +360,7 @@ export function buildChatTools(
       }
     ),
 
-    tool(
+    defineTool(
       "delete_entity",
       "Delete one or more entities by ID.",
       { entity_ids: z.array(z.string().min(1)).min(1) },
@@ -392,7 +378,7 @@ export function buildChatTools(
 
     // ── Workflows ──────────────────────────────────────────────────────
 
-    tool(
+    defineTool(
       "create_workflow",
       "Create a new workflow with a sequence of steps. Each step MUST have: tool (the tool name like list_tasks, llm_generate, create_task, etc.), server (always 'humanoms' for built-in tools), trust_level ('auto' for safe ops, 'approve' for destructive/costly ops that need Discord approval, 'notify' for info-only). Optionally: name (display name), input (object passed to tool), output_mapping, on_failure ('abort'|'skip'|'retry').",
       {
@@ -428,7 +414,7 @@ export function buildChatTools(
       }
     ),
 
-    tool(
+    defineTool(
       "list_workflows",
       "List workflows. Use name_search to find a specific workflow by name instead of listing all.",
       {
@@ -448,7 +434,7 @@ export function buildChatTools(
       }
     ),
 
-    tool(
+    defineTool(
       "get_workflow",
       "Get a single workflow by ID",
       { workflow_id: z.string().min(1) },
@@ -459,7 +445,7 @@ export function buildChatTools(
       }
     ),
 
-    tool(
+    defineTool(
       "update_workflow",
       "Update an existing workflow's name, description, or steps. Same step schema as create_workflow.",
       {
@@ -496,7 +482,7 @@ export function buildChatTools(
       }
     ),
 
-    tool(
+    defineTool(
       "delete_workflow",
       "Delete one or more workflows by ID. Cascade-deletes linked jobs and automations. Pass a single ID or multiple IDs.",
       {
@@ -517,7 +503,7 @@ export function buildChatTools(
       }
     ),
 
-    tool(
+    defineTool(
       "trigger_workflow",
       "Trigger a workflow and create a queued job",
       {
@@ -547,7 +533,7 @@ export function buildChatTools(
 
     // ── Jobs ───────────────────────────────────────────────────────────
 
-    tool(
+    defineTool(
       "list_jobs",
       "List jobs with optional status filter",
       {
@@ -566,7 +552,7 @@ export function buildChatTools(
       }
     ),
 
-    tool(
+    defineTool(
       "get_job",
       "Get job details by ID",
       { job_id: z.string().min(1) },
@@ -579,7 +565,7 @@ export function buildChatTools(
       }
     ),
 
-    tool(
+    defineTool(
       "delete_job",
       "Delete one or more jobs by ID. Also deletes linked approvals.",
       { job_ids: z.array(z.string().min(1)).min(1) },
@@ -598,7 +584,7 @@ export function buildChatTools(
 
     // ── Files ──────────────────────────────────────────────────────────
 
-    tool(
+    defineTool(
       "list_files",
       "List files tracked in the database, optionally filtered by MIME type",
       {
@@ -617,7 +603,7 @@ export function buildChatTools(
       }
     ),
 
-    tool(
+    defineTool(
       "read_file",
       "Read the text content of a local file by path",
       {
@@ -655,7 +641,7 @@ export function buildChatTools(
       }
     ),
 
-    tool(
+    defineTool(
       "web_fetch",
       "Fetch a URL and return its text content",
       {
@@ -686,7 +672,7 @@ export function buildChatTools(
 
     // ── File writing ──────────────────────────────────────────────────
 
-    tool(
+    defineTool(
       "write_file",
       "Write content to a file on disk. Creates parent directories if needed.",
       {
@@ -703,7 +689,7 @@ export function buildChatTools(
 
     // ── Shell command ─────────────────────────────────────────────────
 
-    tool(
+    defineTool(
       "shell_command",
       "Run a shell command. Use for git operations, gh CLI, and other system commands. Returns stdout, stderr, and exit_code.",
       {
@@ -732,7 +718,7 @@ export function buildChatTools(
 
     // ── System ─────────────────────────────────────────────────────────
 
-    tool(
+    defineTool(
       "system_status",
       "Get the current system status including task and entity counts",
       {},
@@ -763,7 +749,7 @@ export function buildChatTools(
 
     // ── Automations ────────────────────────────────────────────────────
 
-    tool(
+    defineTool(
       "create_automation",
       "Create a scheduled automation that triggers a workflow on a cron schedule",
       {
@@ -805,7 +791,7 @@ export function buildChatTools(
       }
     ),
 
-    tool(
+    defineTool(
       "list_automations",
       "List all scheduled automations",
       {
@@ -823,7 +809,7 @@ export function buildChatTools(
         return json(rows.map(deserializeAutomation));
       }
     ),
-    tool(
+    defineTool(
       "update_automation",
       "Update an automation's name, description, cron_expression, or enabled status.",
       {
@@ -856,7 +842,7 @@ export function buildChatTools(
       }
     ),
 
-    tool(
+    defineTool(
       "delete_automation",
       "Delete one or more automations by ID.",
       { automation_ids: z.array(z.string().min(1)).min(1) },

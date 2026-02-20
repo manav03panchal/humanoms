@@ -9,6 +9,11 @@ const ConfigSchema = z.object({
   logLevel: z
     .enum(["fatal", "error", "warn", "info", "debug", "trace", "silent"])
     .default("info"),
+  chatProvider: z.enum(["anthropic", "openai"]).default("anthropic"),
+  chatApiKey: z.string().optional(),
+  chatBaseUrl: z.string().optional(),
+  chatModel: z.string().optional(),
+  chatMaxTokens: z.coerce.number().int().positive().optional(),
 });
 
 export type Config = z.infer<typeof ConfigSchema> & { masterKey: string };
@@ -20,6 +25,11 @@ export function loadConfig(): Config {
     dbPath: process.env.HUMANOMS_DB_PATH,
     masterKey: process.env.HUMANOMS_MASTER_KEY,
     logLevel: process.env.HUMANOMS_LOG_LEVEL,
+    chatProvider: process.env.CHAT_PROVIDER,
+    chatApiKey: process.env.CHAT_API_KEY || process.env.ANTHROPIC_API_KEY || process.env.OPENAI_API_KEY,
+    chatBaseUrl: process.env.CHAT_BASE_URL,
+    chatModel: process.env.CHAT_MODEL,
+    chatMaxTokens: process.env.CHAT_MAX_TOKENS,
   });
 
   let masterKey = raw.masterKey;

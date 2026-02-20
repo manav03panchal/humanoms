@@ -12,6 +12,7 @@ import { createDiscordSender } from "./notifications/discord.ts";
 import { SecretStore } from "./security/secrets.ts";
 import { deriveKey } from "./security/encryption.ts";
 import { ApprovalManager } from "./jobs/approval.ts";
+import { createProvider } from "./chat/providers/index.ts";
 
 const log = createChildLogger("main");
 
@@ -45,10 +46,23 @@ if (process.argv.includes("--mcp")) {
   });
   scheduler.start();
 
+  // ── Chat provider ─────────────────────────────────────────────────
+  if (!config.chatApiKey) {
+    log.warn("No CHAT_API_KEY / ANTHROPIC_API_KEY set — chat will not work");
+  }
+  const chatProvider = createProvider({
+    provider: config.chatProvider,
+    apiKey: config.chatApiKey || "",
+    baseUrl: config.chatBaseUrl,
+    model: config.chatModel || (config.chatProvider === "anthropic" ? "claude-sonnet-4-6" : "gpt-4o"),
+    maxTokens: config.chatMaxTokens,
+  });
+
   // ── HTTP server ────────────────────────────────────────────────────
   const app = createApp({
     db,
     apiKeyHash,
+    chatProvider,
     scheduler,
   });
 

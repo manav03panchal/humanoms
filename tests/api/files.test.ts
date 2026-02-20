@@ -2,6 +2,7 @@ import { describe, test, expect, beforeEach, afterEach } from "bun:test";
 import { Database } from "bun:sqlite";
 import { applySchema } from "../../src/db/schema.ts";
 import { createApp } from "../../src/api/server.ts";
+import { stubProvider } from "../helpers/stub-provider.ts";
 import { join } from "path";
 import { tmpdir } from "os";
 import { unlinkSync, writeFileSync } from "fs";
@@ -14,7 +15,7 @@ describe("Files API", () => {
   beforeEach(() => {
     db = new Database(":memory:");
     applySchema(db);
-    app = createApp({ db, apiKeyHash: null });
+    app = createApp({ db, apiKeyHash: null, chatProvider: stubProvider });
 
     // Create a temporary file for registration tests
     tmpFile = join(tmpdir(), `humanoms-test-${Date.now()}.txt`);

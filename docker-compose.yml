@@ -7,7 +7,11 @@ services:
       - humanoms-data:/app/data
     environment:
       - HUMANOMS_MASTER_KEY=${HUMANOMS_MASTER_KEY}
-      - ANTHROPIC_API_KEY=${ANTHROPIC_API_KEY}
+      - HUMANOMS_HOST=0.0.0.0
+      - CHAT_PROVIDER=${CHAT_PROVIDER:-anthropic}
+      - CHAT_API_KEY=${CHAT_API_KEY}
+      - CHAT_BASE_URL=${CHAT_BASE_URL:-}
+      - CHAT_MODEL=${CHAT_MODEL:-}
     restart: unless-stopped
 
 volumes:

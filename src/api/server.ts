@@ -16,10 +16,12 @@ import { createChatRoutes } from "./routes/chat.ts";
 import { dashboardRoutes } from "./routes/dashboard.ts";
 
 import type { Scheduler } from "../scheduler/scheduler.ts";
+import type { ChatProvider } from "../chat/providers/types.ts";
 
 interface AppConfig {
   db: Database;
   apiKeyHash: string | null;
+  chatProvider: ChatProvider;
   scheduler?: Scheduler;
 }
 
@@ -50,7 +52,7 @@ export function createApp(config: AppConfig) {
   app.route("/api/v1/automations", automationsRoutes(config.db));
   app.route("/api/v1/files", filesRoutes(config.db));
   app.route("/api/v1/jobs", jobsRoutes(config.db));
-  app.route("/api/v1", createChatRoutes(config.db, config.scheduler));
+  app.route("/api/v1", createChatRoutes(config.db, config.chatProvider, config.scheduler));
   app.route("/api/v1/dashboard", dashboardRoutes(config.db));
 
   // Root redirect
