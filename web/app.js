@@ -55,25 +55,12 @@ function LoginGate({ onLogin }) {
   `;
 }
 
-function ChatView() {
-  const [messages, setMessages] = useState([]);
-  const [conversationId, setConversationId] = useState(null);
+function ChatView({ messages, setMessages, conversationId, setConversationId }) {
   const [isStreaming, setIsStreaming] = useState(false);
   const [currentAssistantMessage, setCurrentAssistantMessage] = useState('');
   const [currentToolCalls, setCurrentToolCalls] = useState([]);
   const [isThinking, setIsThinking] = useState(false);
   const abortRef = useRef(null);
-
-  function handleNewChat() {
-    if (isStreaming && abortRef.current) {
-      abortRef.current.abort();
-    }
-    setMessages([]);
-    setConversationId(null);
-    setIsStreaming(false);
-    setCurrentAssistantMessage('');
-    setCurrentToolCalls([]);
-  }
 
   async function handleSend(text) {
     setMessages(prev => [...prev, { role: 'user', content: text }]);
@@ -252,6 +239,10 @@ function MainView({ onLogout }) {
   const [tab, setTab] = useState('chat');
   const [theme, setTheme] = useState(getInitialTheme);
 
+  // Chat state lives here so it survives tab switches
+  const [messages, setMessages] = useState([]);
+  const [conversationId, setConversationId] = useState(null);
+
   useEffect(() => {
     document.documentElement.dataset.theme = theme;
     localStorage.setItem('humanoms_theme', theme);
@@ -259,6 +250,11 @@ function MainView({ onLogout }) {
 
   function toggleTheme() {
     setTheme(t => t === 'dark' ? 'light' : 'dark');
+  }
+
+  function handleNewChat() {
+    setMessages([]);
+    setConversationId(null);
   }
 
   const themeIcon = theme === 'dark' ? ICONS.sun : ICONS.moon;
@@ -276,12 +272,18 @@ function MainView({ onLogout }) {
         <div class="top-bar-actions">
           <button class="icon-btn" onClick=${toggleTheme} title="Toggle theme" dangerouslySetInnerHTML=${{ __html: themeIcon }} />
           ${tab === 'chat' && html`
-            <button class="icon-btn" title="New chat" dangerouslySetInnerHTML=${{ __html: ICONS.plus }} />
+            <button class="icon-btn" onClick=${handleNewChat} title="New chat" dangerouslySetInnerHTML=${{ __html: ICONS.plus }} />
           `}
           <button class="icon-btn" onClick=${onLogout} title="Logout" dangerouslySetInnerHTML=${{ __html: ICONS.logOut }} />
         </div>
       </div>
-      ${tab === 'chat' ? html`<${ChatView} />` : html`<${Dashboard} />`}
+      <div style="display:${tab === 'chat' ? 'flex' : 'none'};flex:1;flex-direction:column;min-height:0">
+        <${ChatView} messages=${messages} setMessages=${setMessages}
+          conversationId=${conversationId} setConversationId=${setConversationId} />
+      </div>
+      <div style="display:${tab === 'dashboard' ? 'flex' : 'none'};flex:1;flex-direction:column;min-height:0">
+        <${Dashboard} />
+      </div>
       <${ToastContainer} />
     </div>
   `;
