@@ -61,10 +61,10 @@ export function validateShellCommand(command: string): void {
 
 // ── File path restriction ────────────────────────────────────────────────
 
-const ALLOWED_PATH_PREFIXES = [
-  "/Users/manavpanchal/Desktop/Projects",
-  "/tmp",
-];
+const ALLOWED_PATH_PREFIXES = (process.env.HUMANOMS_ALLOWED_PATHS || "/app,/tmp")
+  .split(",")
+  .map(s => s.trim())
+  .filter(Boolean);
 
 export function validateFilePath(filePath: string): void {
   const resolved = path.resolve(filePath);

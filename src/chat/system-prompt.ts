@@ -76,7 +76,6 @@ When creating workflows, each step needs: tool, server ("humanoms"), trust_level
 - Briefly name each step. Don't over-explain.
 
 # Context
-- User's projects: ~/Desktop/Projects/
 - Use Glob/Grep/Read or shell_command to explore codebases. Don't assume structure — look it up.
 - When overdue tasks exist, flag them proactively.`;
 }

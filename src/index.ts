@@ -39,6 +39,10 @@ if (process.argv.includes("--mcp")) {
   // mangles Argon2 hashes because it expands $ even inside quotes).
   const apiKeyHash = secrets.get("api_key_hash") ?? null;
 
+  // ── Expose secrets as env vars for CLI tools (gh, etc.) ────────────
+  const githubToken = secrets.get("github_token");
+  if (githubToken) process.env.GH_TOKEN = githubToken;
+
   // ── Job queue + executor ───────────────────────────────────────────
   const jobQueue = new JobQueue(db);
   const executor = new WorkflowExecutor(db, jobQueue, config.masterKey);
