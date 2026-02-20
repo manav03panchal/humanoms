@@ -4,9 +4,32 @@ import dns from "dns/promises";
 // ── Shell command allowlist ──────────────────────────────────────────────
 
 const SHELL_ALLOWLIST = new Set([
-  "git", "gh", "ls", "cat", "echo", "date", "mkdir", "cp", "mv",
-  "find", "grep", "head", "tail", "wc", "sort", "uniq", "diff",
+  // version control
+  "git", "gh",
+  // file ops
+  "ls", "cat", "echo", "mkdir", "cp", "mv", "rm", "touch", "chmod",
+  "ln", "realpath", "basename", "dirname", "stat", "file", "tree",
+  // text processing
+  "grep", "head", "tail", "wc", "sort", "uniq", "diff", "cut", "tr",
+  "sed", "awk", "tee", "xargs", "column", "paste", "fold", "fmt",
+  // search
+  "find", "which", "whereis",
+  // network
   "curl", "wget",
+  // archive
+  "tar", "gzip", "gunzip", "zip", "unzip",
+  // system info
+  "date", "hostname", "uname", "whoami", "id", "env", "printenv",
+  "uptime", "df", "du", "free", "ps", "top",
+  // json / data
+  "jq",
+  // node / bun ecosystem
+  "node", "bun", "npm", "npx", "bunx",
+  // python (useful for quick scripts)
+  "python3", "python", "pip", "pip3",
+  // misc
+  "true", "false", "yes", "test", "expr", "seq", "sleep",
+  "md5sum", "sha256sum", "base64",
 ]);
 
 const DANGEROUS_PATTERNS = [

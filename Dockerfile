@@ -11,7 +11,7 @@ FROM base
 
 # Install system tools used by shell_command (git, gh, curl, wget)
 RUN apt-get update && apt-get install -y --no-install-recommends \
-      git curl wget ca-certificates \
+      git curl wget jq tree ca-certificates \
     && curl -fsSL https://cli.github.com/packages/githubcli-archive-keyring.gpg \
        -o /usr/share/keyrings/githubcli-archive-keyring.gpg \
     && echo "deb [arch=$(dpkg --print-architecture) signed-by=/usr/share/keyrings/githubcli-archive-keyring.gpg] https://cli.github.com/packages stable main" \
