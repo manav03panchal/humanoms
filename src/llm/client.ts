@@ -26,8 +26,12 @@ export async function llmCall(input: LlmCallInput): Promise<string> {
 
   log.info({ model: tier, promptLength: input.prompt.length }, "LLM call");
 
-  // Use the same CHAT_API_KEY / provider as the chat endpoint
   const provider = process.env.CHAT_PROVIDER || "anthropic";
+
+  if (provider === "claude-code") {
+    return callClaudeCode(ANTHROPIC_MODELS[tier], input);
+  }
+
   const apiKey = process.env.CHAT_API_KEY || process.env.ANTHROPIC_API_KEY || "";
 
   if (provider === "anthropic") {
@@ -40,6 +44,45 @@ export async function llmCall(input: LlmCallInput): Promise<string> {
       input
     );
   }
+}
+
+async function callClaudeCode(
+  model: string,
+  input: LlmCallInput
+): Promise<string> {
+  const { query } = await import("@anthropic-ai/claude-agent-sdk");
+
+  let text = "";
+  const stream = query({
+    prompt: input.prompt,
+    options: {
+      systemPrompt: input.system || "",
+      tools: [],
+      permissionMode: "bypassPermissions",
+      allowDangerouslySkipPermissions: true,
+      model,
+      maxTurns: 1,
+      persistSession: false,
+      env: Object.fromEntries(
+        Object.entries(process.env).filter(([k]) => k !== "CLAUDECODE")
+      ),
+    },
+  });
+
+  for await (const message of stream) {
+    if (message.type === "stream_event") {
+      const event = message.event as any;
+      if (
+        event.type === "content_block_delta" &&
+        event.delta?.type === "text_delta" &&
+        event.delta.text
+      ) {
+        text += event.delta.text;
+      }
+    }
+  }
+
+  return text;
 }
 
 async function callAnthropic(
