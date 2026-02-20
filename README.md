@@ -45,15 +45,31 @@ This opens a browser for OAuth. Once authenticated, credentials are stored in `~
 docker compose up -d --build
 ```
 
-### 4. Set up login
+### 4. Run the setup wizard
 
-Generate an API key for the web UI:
+The interactive wizard generates your API key and lets you configure all integrations in one go:
 
 ```bash
-docker exec humanoms-humanoms-1 bun run scripts/setup-api-key.ts
+docker exec -it humanoms-humanoms-1 bun run scripts/setup.ts
 ```
 
-This prints a `homs_...` key. **Save it** -- it's shown once and can't be recovered. Paste it into the login screen.
+It walks you through:
+- **Master passphrase** -- encrypts all secrets in the database
+- **API key** -- for the web UI login (printed once, save it)
+- **Discord** -- bot token + channel ID for workflow approvals and notifications
+- **Brave Search** -- API key for web search tools
+- **Exa** -- API key for semantic search
+- **GitHub** -- personal access token for repo operations (issues, PRs, pushes)
+
+It also registers MCP tool servers (Brave Search, GitHub) in the tool registry.
+
+Press Enter to skip any integration you don't need -- you can always add them later:
+
+```bash
+docker exec humanoms-humanoms-1 bun run scripts/add-secret.ts <key> <value>
+```
+
+Available secret keys: `discord_bot_token`, `discord_channel_id`, `brave_api_key`, `exa_api_key`, `github_token`
 
 ### 5. Open
 
@@ -91,14 +107,18 @@ Any provider that speaks OpenAI's API format works out of the box. Set these in 
 
 For Ollama, install it on the host first (`curl -fsSL https://ollama.com/install.sh | sh && ollama pull llama3.2`), then set `CHAT_BASE_URL` to your host IP (not `localhost` from inside Docker -- use `http://host.docker.internal:11434/v1` on Docker Desktop, or your machine's LAN IP).
 
-## Discord Notifications (Optional)
+## Integrations
 
-For workflow approval buttons and job notifications:
+All integrations are configured through the setup wizard (`bun run scripts/setup.ts`) or individually via `bun run scripts/add-secret.ts`. Secrets are encrypted with your master passphrase and stored in SQLite.
 
-1. Create a Discord bot at https://discord.com/developers/applications
+### Discord
+
+Workflow approval buttons and job notifications.
+
+1. Create a bot at https://discord.com/developers/applications
 2. Enable **Message Content Intent** under Bot settings
-3. Invite it to your server with `bot` + `applications.commands` scopes
-4. Store the credentials:
+3. Invite to your server with `bot` + `applications.commands` scopes
+4. Add credentials:
 
 ```bash
 docker exec humanoms-humanoms-1 bun run scripts/add-secret.ts discord_bot_token "your-bot-token"
@@ -106,6 +126,41 @@ docker exec humanoms-humanoms-1 bun run scripts/add-secret.ts discord_channel_id
 ```
 
 5. Restart: `docker compose restart`
+
+### GitHub
+
+Create issues, pull requests, and push files through chat.
+
+1. Generate a PAT at https://github.com/settings/tokens with the scopes you need (e.g. `repo`, `issues`)
+2. Add it:
+
+```bash
+docker exec humanoms-humanoms-1 bun run scripts/add-secret.ts github_token "ghp_your-token"
+```
+
+The setup wizard also registers the `@anthropic-ai/github-mcp` tool server automatically.
+
+### Brave Search
+
+Web search capability for the AI.
+
+1. Get an API key at https://brave.com/search/api
+2. Add it:
+
+```bash
+docker exec humanoms-humanoms-1 bun run scripts/add-secret.ts brave_api_key "your-key"
+```
+
+### Exa
+
+Semantic/neural web search.
+
+1. Get an API key at https://exa.ai
+2. Add it:
+
+```bash
+docker exec humanoms-humanoms-1 bun run scripts/add-secret.ts exa_api_key "your-key"
+```
 
 ## Features
 
@@ -137,7 +192,7 @@ Requires [Bun](https://bun.sh):
 
 ```bash
 bun install
-cp .env.example .env   # edit with your values
+bun run scripts/setup.ts   # interactive wizard — sets up .env, API key, and integrations
 bun run src/index.ts
 ```
 
