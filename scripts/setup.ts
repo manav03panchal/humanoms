@@ -159,10 +159,9 @@ async function main() {
     console.log(`    ${server.name}`);
   }
 
-  // Step 6: Write .env file
+  // Step 6: Write .env file (skip in Docker — env vars come from docker-compose.yml)
   // NOTE: API key hash is stored ONLY in the database (via SecretStore above).
   // Bun's .env parser expands $ even inside quotes, which destroys Argon2 hashes.
-  console.log("\n  Generating .env file...");
   const envContent = `# HumanOMS Configuration
 HUMANOMS_PORT=3747
 HUMANOMS_HOST=localhost
@@ -172,13 +171,16 @@ HUMANOMS_LOG_LEVEL=info
 `;
 
   const envPath = resolve(process.cwd(), ".env");
-  await Bun.write(envPath, envContent);
-  console.log(`  Written: ${envPath}`);
+  try {
+    await Bun.write(envPath, envContent);
+    console.log(`\n  Generated .env: ${envPath}`);
+  } catch {
+    console.log("\n  Skipped .env generation (read-only filesystem — normal in Docker).");
+  }
 
   // Done
   db.close();
-  console.log("\n  Setup complete! Start with:\n");
-  console.log("    bun run src/index.ts\n");
+  console.log("\n  Setup complete!\n");
 
   rl.close();
 }
