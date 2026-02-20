@@ -1,83 +1,33 @@
 import path from "path";
 import dns from "dns/promises";
 
-// ── Shell command allowlist ──────────────────────────────────────────────
+// ── Shell command validation ─────────────────────────────────────────────
+// Runs inside Docker — allow everything, just block host-escape attempts.
 
-const SHELL_ALLOWLIST = new Set([
-  // version control
-  "git", "gh",
-  // file ops
-  "ls", "cat", "echo", "mkdir", "cp", "mv", "rm", "touch", "chmod",
-  "ln", "realpath", "basename", "dirname", "stat", "file", "tree",
-  // text processing
-  "grep", "head", "tail", "wc", "sort", "uniq", "diff", "cut", "tr",
-  "sed", "awk", "tee", "xargs", "column", "paste", "fold", "fmt",
-  // search
-  "find", "which", "whereis",
-  // network
-  "curl", "wget",
-  // archive
-  "tar", "gzip", "gunzip", "zip", "unzip",
-  // system info
-  "date", "hostname", "uname", "whoami", "id", "env", "printenv",
-  "uptime", "df", "du", "free", "ps", "top",
-  // json / data
-  "jq",
-  // node / bun ecosystem
-  "node", "bun", "npm", "npx", "bunx",
-  // python (useful for quick scripts)
-  "python3", "python", "pip", "pip3",
-  // misc
-  "true", "false", "yes", "test", "expr", "seq", "sleep",
-  "md5sum", "sha256sum", "base64",
+const BLOCKED_BINARIES = new Set([
+  "reboot", "shutdown", "poweroff", "halt", "init",
+  "mount", "umount", "fdisk", "mkfs", "dd",
+  "iptables", "ip6tables", "nftables",
+  "insmod", "rmmod", "modprobe",
 ]);
 
-const DANGEROUS_PATTERNS = [
-  /`/,           // backtick execution
-  /\$\(/,        // subshell execution
-  /\beval\b/,    // eval
-  /\bexec\b/,    // exec
-  /\bsource\b/,  // source
-  />>\s*\/etc/,  // append to /etc
-  /\/dev\//,     // device files
-];
-
-/**
- * Extract the base binary name from a command segment.
- * Handles env vars prefixed (e.g. FOO=bar cmd) and absolute paths (e.g. /usr/bin/git).
- */
-function extractBinary(segment: string): string {
-  const trimmed = segment.trim();
-  // Skip leading env var assignments like VAR=value
-  const tokens = trimmed.split(/\s+/);
-  for (const token of tokens) {
-    if (/^[A-Za-z_][A-Za-z0-9_]*=/.test(token)) continue;
-    // Return just the basename for absolute/relative paths
-    return path.basename(token);
-  }
-  return tokens[0] ? path.basename(tokens[0]) : "";
-}
-
 export function validateShellCommand(command: string): void {
-  // Check dangerous patterns
-  for (const pattern of DANGEROUS_PATTERNS) {
-    if (pattern.test(command)) {
-      throw new Error(`shell_command: command rejected (dangerous pattern: ${pattern.source})`);
-    }
+  // Block obvious host-escape / destructive-to-container patterns
+  if (/\brm\s+(-\S+\s+)*\/\s*$/.test(command)) {
+    throw new Error("shell_command: refusing to rm /");
   }
 
-  // Check that the "." command is not used as a standalone command (source alias)
-  // Match: starts with "." followed by space, or after pipe/semicolon
-  if (/(?:^|\||\;)\s*\.\s+/.test(command)) {
-    throw new Error("shell_command: command rejected (dangerous pattern: . command)");
-  }
-
-  // Split on pipes and semicolons, check each segment
-  const segments = command.split(/[|;]/).map(s => s.trim()).filter(Boolean);
+  // Check for blocked binaries in each pipe/semicolon segment
+  const segments = command.split(/[|;&]/).map(s => s.trim()).filter(Boolean);
   for (const segment of segments) {
-    const binary = extractBinary(segment);
-    if (binary && !SHELL_ALLOWLIST.has(binary)) {
-      throw new Error(`shell_command: binary '${binary}' is not in the allowlist`);
+    const tokens = segment.split(/\s+/);
+    for (const token of tokens) {
+      if (/^[A-Za-z_][A-Za-z0-9_]*=/.test(token)) continue;
+      const binary = path.basename(token);
+      if (BLOCKED_BINARIES.has(binary)) {
+        throw new Error(`shell_command: '${binary}' is blocked`);
+      }
+      break;
     }
   }
 }
